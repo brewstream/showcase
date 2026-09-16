@@ -43,10 +43,13 @@ public class SrtIngestService implements AutoCloseable {
     private final Map<String, Ingest> byStreamId = new ConcurrentHashMap<>();
     private final SrtListener listener;
     private final int port;
+    private final int proxyPort;
 
     SrtIngestService(@Value("${brewstream.srt.port}") int port,
+            @Value("${brewstream.proxy.port}") int proxyPort,
             @Value("${brewstream.srt.latency-ms}") int latencyMillis) throws InterruptedException {
         this.port = port;
+        this.proxyPort = proxyPort;
         this.listener = SrtListener.bind(new InetSocketAddress(port),
                 SrtConfig.defaults().withLatency(Duration.ofMillis(latencyMillis)));
 
@@ -96,9 +99,16 @@ public class SrtIngestService implements AutoCloseable {
     public List<StreamSnapshot> snapshots() {
         List<StreamSnapshot> out = new ArrayList<>(byStreamId.size());
         for (Ingest ingest : byStreamId.values()) {
+            // A publisher that came through the relay appears to the listener as
+            // the relay itself, so the peer port is what distinguishes the two.
+            // Worth detecting rather than documenting: publishing to the listener
+            // directly works perfectly and looks completely healthy whatever the
+            // slider says, which is a confusing thing to debug.
+            java.net.InetSocketAddress peer = ingest.connection.metadata().peerAddress();
             out.add(StreamSnapshot.of(
                     ingest.connection.metadata().streamId(),
-                    String.valueOf(ingest.connection.metadata().peerAddress()),
+                    String.valueOf(peer),
+                    peer.getPort() == proxyPort,
                     ingest.connection.stats(),
                     ingest.analyzer.stats()));
         }

@@ -21,6 +21,10 @@ import java.util.List;
  * @param peer        where it is publishing from
  * @param transport   Roast's view: loss, retransmission, RTT, buffer occupancy
  * @param media       Grind's view: continuity, clock, programs and tracks
+ * @param viaRelay    whether this publisher came through the loss relay. A stream that
+ *                    went straight to the listener is unaffected by the slider, and
+ *                    silently looks perfectly healthy no matter where it is set - which
+ *                    is a confusing thing to stare at, so the page says so
  * @param tracks      the media tracks, flattened for display
  */
 public record StreamSnapshot(
@@ -28,6 +32,7 @@ public record StreamSnapshot(
         String peer,
         Transport transport,
         Media media,
+        boolean viaRelay,
         List<Track> tracks) {
 
     /**
@@ -38,7 +43,11 @@ public record StreamSnapshot(
      * @param packetsLost          packets a gap was detected for — most are recovered
      * @param packetsDropped       packets given up on by TLPKTDROP. <b>This is data that is
      *                             gone</b>, and the number that turns into visible damage
-     * @param retransmitRate       retransmitted packets as a fraction of all sent, lifetime
+     * @param retransmitRate       retransmitted packets as a fraction of all sent, lifetime. Always
+     *                             zero here: this side only receives, so it retransmits nothing
+     * @param packetsRecovered     packets that arrived as retransmissions — what the peer resent
+     *                             because we asked. <b>The figure that shows ARQ working</b>
+     * @param recoveryRate         those as a fraction of everything that should have arrived
      * @param receiveRateBytes     arrival rate over the last measurement window
      * @param flowWindowPackets    the receive window advertised to the peer
      * @param receiveBuffered      packets held awaiting their TSBPD deadline
@@ -51,6 +60,8 @@ public record StreamSnapshot(
             long packetsLost,
             long packetsDropped,
             double retransmitRate,
+            long packetsRecovered,
+            double recoveryRate,
             int receiveRateBytes,
             int flowWindowPackets,
             int receiveBuffered,
@@ -106,7 +117,7 @@ public record StreamSnapshot(
     }
 
     /** Builds a snapshot from the two libraries' own views, taken together. */
-    public static StreamSnapshot of(String streamId, String peer,
+    public static StreamSnapshot of(String streamId, String peer, boolean viaRelay,
             ConnectionStats connection, TsStreamStats stream) {
 
         Transport transport = new Transport(
@@ -115,6 +126,8 @@ public record StreamSnapshot(
                 connection.packetsLost(),
                 connection.packetsDropped(),
                 connection.retransmitRate(),
+                connection.packetsRecovered(),
+                connection.recoveryRate(),
                 connection.receiveRateBytesPerSecond(),
                 connection.flowWindowPackets(),
                 connection.receiveBufferedPackets(),
@@ -154,7 +167,7 @@ public record StreamSnapshot(
                     pid.carriesPcr()));
         }
 
-        return new StreamSnapshot(streamId, peer, transport, media, List.copyOf(tracks));
+        return new StreamSnapshot(streamId, peer, transport, media, viaRelay, List.copyOf(tracks));
     }
 
     private static String describe(ProgramMap programs, ElementaryStream elementary) {

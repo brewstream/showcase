@@ -47,7 +47,12 @@
     text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
     border: 1px solid currentColor;
   }
-  .pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); }
+  .pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); }
+  .bypass {
+    background: rgba(216,163,74,.08); border-bottom: 1px solid var(--line);
+    color: var(--warn); padding: 10px 18px; font-size: 12.5px;
+  }
+  .bypass code { background: transparent; border: 0; padding: 0; color: inherit; }
   .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
   @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
   .panel { background: var(--panel); padding: 16px 18px 18px; }
@@ -132,12 +137,16 @@
   latency budget — those are gone, and they land as continuity errors on a
   specific track a moment later.</p>
 
-  <p><b>Try this.</b> At <b>2%</b> the retransmit rate climbs but continuity
-  errors stay at zero: every lost packet is being recovered inside the budget,
-  and the media is untouched. That is SRT working, and it is the more interesting
-  half of the demonstration. Push toward <b>20%</b> and recovery runs out of room
-  — <i>dropped</i> becomes non-zero, and moments later a continuity error lands on
-  a named track while the others may stay clean.</p>
+  <p><b>Try this.</b> At <b>5%</b>, watch <i>lost</i> and <i>recovered</i> climb
+  together while <i>dropped</i> and the continuity errors stay at zero. Every lost
+  packet is being retransmitted and arriving in time, and the media is untouched.
+  That is SRT working, and it is the more interesting half of the demonstration.
+  Push the slider up until <i>dropped</i> moves — that is the budget running out,
+  and a continuity error lands on a named track moments later.</p>
+
+  <p><i>Recovered</i> counts packets that arrived carrying the retransmit flag.
+  <i>Retransmit rate</i> is not shown because it is a send-side figure and this
+  side only receives: it would read zero however hard ARQ was working.</p>
 
   <p>Loss is applied in <b>both directions</b>, so the NAKs asking for a
   retransmission and the ACKs confirming arrival are as exposed as the data.
@@ -187,6 +196,16 @@ function render(data) {
     // mostly recovered. Coloured differently on purpose.
     const droppedClass = t.packetsDropped > 0 ? "bad" : "ok";
     const errorClass = m.continuityErrors > 0 ? "bad" : "ok";
+    // Recovery is the number that explains "lost but undamaged". Without it the
+    // dashboard shows loss going in and nothing coming out, with no sign of the
+    // work in between.
+    const recovered = t.packetsRecovered > 0
+      ? `${fmt(t.packetsRecovered)} <small style="color:var(--dim)">(${(t.recoveryRate * 100).toFixed(1)}%)</small>`
+      : "0";
+    const bypass = s.viaRelay ? "" : `<div class="bypass">
+        Publishing straight to the listener on port ${data.srtPort} — the loss slider
+        does not affect this stream. Republish to <code>srt://127.0.0.1:${data.publishPort}</code>
+        to route it through the relay.</div>`;
 
     const rows = s.tracks.map(tr => `
       <tr>
@@ -200,8 +219,10 @@ function render(data) {
 
     return `<section class="stream">
       <h2>${s.streamId}<span class="peer">${s.peer}</span>
+        ${s.viaRelay ? "" : '<span class="pill warn">relay bypassed</span>'}
         <span class="pill ${m.healthy ? "ok" : "bad"}">${m.healthy ? "healthy" : "degraded"}</span>
       </h2>
+      ${bypass}
       <div class="panels">
         <div class="panel">
           <h3>Transport · Roast</h3>
@@ -209,8 +230,8 @@ function render(data) {
             ${metric("RTT", (t.rttMicros / 1000).toFixed(1) + " ms")}
             ${metric("Received", fmt(t.packetsReceived))}
             ${metric("Lost", fmt(t.packetsLost), t.packetsLost > 0 ? "warn" : "")}
+            ${metric("Recovered", recovered, t.packetsRecovered > 0 ? "ok" : "")}
             ${metric("Dropped", fmt(t.packetsDropped), droppedClass)}
-            ${metric("Retransmit", (t.retransmitRate * 100).toFixed(2) + " %")}
             ${metric("Rate", bytes(t.receiveRateBytes))}
             ${metric("Buffered", fmt(t.receiveBuffered))}
             ${metric("Flow window", fmt(t.flowWindowPackets))}
