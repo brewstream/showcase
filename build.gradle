@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+}
+
+group = 'org.brewstream'
+version = '0.1.0-SNAPSHOT'
+description = 'BrewStream showcase: SRT ingest with live transport and media health'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform("org.springframework.boot:spring-boot-dependencies:4.1.1")
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // The two libraries this exists to demonstrate. Roast is published; Grind is
+    // substituted from the sibling build by the composite above.
+    implementation 'io.github.brewstream:roast:0.1.1'
+    implementation 'io.github.brewstream:grind'
+    implementation 'io.github.brewstream:grind-netty'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+test {
+    useJUnitPlatform()
+}

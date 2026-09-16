@@ -1,0 +1,13 @@
+rootProject.name = 'brewstream-showcase'
+
+// Grind is not published yet, so it comes from the sibling checkout. The
+// substitutions are explicit because Gradle matches a composite build on the
+// *project* names - :core and :netty - while Grind publishes as grind and
+// grind-netty. Without these the dependencies simply fail to resolve, with no
+// hint that a composite build is involved.
+includeBuild('../grind') {
+    dependencySubstitution {
+        substitute module('io.github.brewstream:grind') using project(':core')
+        substitute module('io.github.brewstream:grind-netty') using project(':netty')
+    }
+}
