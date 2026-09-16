@@ -15,15 +15,42 @@ together they are a causal chain you can watch.
 ./gradlew bootRun
 ```
 
-Then open <http://localhost:8080> and publish something to it:
+Then open <http://localhost:8080> and publish to port **9001**, the loss relay:
 
 ```sh
 ffmpeg -re -f lavfi -i testsrc=size=640x360:rate=25 -f lavfi -i sine \
-  -c:v libx264 -preset ultrafast -c:a aac \
-  -f mpegts "srt://127.0.0.1:9000?streamid=live/demo"
+  -c:v libx264 -preset ultrafast -bf 2 -g 25 -c:a aac \
+  -f mpegts "srt://127.0.0.1:9001?streamid=live/demo"
 ```
 
+Publishing to 9000 goes straight to the listener and works fine — it just
+bypasses the relay, so the loss slider does nothing.
+
 The dashboard polls `/api/streams` once a second.
+
+## The loss slider
+
+Loopback loses nothing, so without help every figure worth watching sits at zero.
+A relay in front of the listener discards a settable fraction of packets, and the
+slider changes it while the stream runs.
+
+| Setting | What happens |
+|---|---|
+| **0%** | everything green, retransmit rate zero |
+| **2%** | retransmissions climb — **and continuity errors stay at zero**. Every lost packet is recovered inside the latency budget. This is SRT working, and it is the more interesting half |
+| **20%** | recovery runs out of room. `dropped` becomes non-zero, and moments later a continuity error lands on a named track |
+
+Loss is applied in **both directions**, so the NAKs asking for a retransmission
+and the ACKs confirming arrival are as exposed as the data itself — recovery has
+to survive losing its own signalling.
+
+The measured rate is shown beside the requested one on purpose: a slider claiming
+10% is worth nothing next to the relay's own count proving 10% went missing.
+
+**The other knob is latency.** `brewstream.srt.latency-ms` is the recovery budget
+ARQ gets. At 500ms the same 20% loss recovers cleanly; at 40ms even 2% starts
+causing damage. Unlike the drop rate it is negotiated during the handshake, so
+changing it means restarting both the app and the publisher.
 
 ## What it shows
 
@@ -74,7 +101,8 @@ brewstream/
 
 | Property | Default | |
 |---|---|---|
-| `brewstream.srt.port` | 9000 | the port publishers connect to |
+| `brewstream.srt.port` | 9000 | the SRT listener itself |
+| `brewstream.proxy.port` | 9001 | the loss relay publishers should point at |
 | `brewstream.srt.latency-ms` | 120 | TSBPD latency: the recovery budget ARQ gets before TLPKTDROP gives up. The most visible knob here |
 | `server.port` | 8080 | the dashboard |
 
