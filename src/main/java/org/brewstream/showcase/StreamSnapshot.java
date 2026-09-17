@@ -84,6 +84,10 @@ public record StreamSnapshot(
      *                          apart from the health badge rather than feeding it —
      *                          ffmpeg spaces PCRs at 80ms and those streams are fine
      * @param maxPcrIntervalMillis the widest of those gaps, which says by how much
+     * @param ptsErrors         tracks going longer than TR 101 290's 700ms without a PTS.
+     *                          Also conformance rather than damage — but unlike the PCR
+     *                          figure this one stays quiet on ordinary streams, so a
+     *                          non-zero reading is worth acting on
      * @param erroredSeconds    seconds of stream time containing at least one error, counted
      *                          once however many it holds. The figure a broadcast probe leads
      *                          with, because it answers "for how long was this broken" rather
@@ -103,6 +107,7 @@ public record StreamSnapshot(
             long pcrDiscontinuities,
             long pcrRepetitionErrors,
             double maxPcrIntervalMillis,
+            long ptsErrors,
             long erroredSeconds,
             long observedSeconds,
             long syncLosses,
@@ -130,6 +135,9 @@ public record StreamSnapshot(
      *                       a GOP depends on the frame that begins it, so one gap ruins all of
      *                       it. Read it on video — nearly every audio frame is its own
      *                       random-access point, so there it is just an error count
+     * @param maxPtsIntervalMillis the widest gap between this track's timestamps. Reads 0
+     *                       where several PTS arrive between two PCRs, which is the normal
+     *                       case on video — the clock only moves when a PCR does
      * @param gopLengthPackets average packets between random-access points. On video this is
      *                       how far damage propagates: everything in a GOP depends on the
      *                       frame that begins it. On audio it is close to 1, since nearly
@@ -148,6 +156,7 @@ public record StreamSnapshot(
             long randomAccessPoints,
             long erroredSeconds,
             long damagedGops,
+            double maxPtsIntervalMillis,
             double gopLengthPackets) {
     }
 
@@ -178,6 +187,7 @@ public record StreamSnapshot(
                 stream.pcrDiscontinuities(),
                 stream.pcrRepetitionErrors(),
                 widestPcrInterval(stream),
+                stream.ptsErrors(),
                 stream.erroredSeconds(),
                 stream.observedSeconds(),
                 stream.syncLosses(),
@@ -192,7 +202,7 @@ public record StreamSnapshot(
                 // Shown anyway: a track that is declared but silent is exactly
                 // the kind of thing worth noticing.
                 tracks.add(new Track(elementary.pid(), describe(programs, elementary),
-                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0, 0));
+                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0, 0, 0));
                 continue;
             }
             tracks.add(new Track(
@@ -208,6 +218,7 @@ public record StreamSnapshot(
                     pid.randomAccessPoints(),
                     pid.erroredSeconds(),
                     pid.damagedGops(),
+                    pid.maxPtsIntervalMillis(),
                     pid.gopLengthPackets()));
         }
 
