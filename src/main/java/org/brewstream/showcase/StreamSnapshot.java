@@ -75,7 +75,16 @@ public record StreamSnapshot(
      * @param packets           transport packets seen
      * @param continuityErrors  counter jumps — where transport loss becomes media damage
      * @param packetsLostInTs   how many packets those jumps account for
-     * @param tableCrcFailures  PSI sections discarded for a bad checksum
+     * @param crcErrors         PSI sections discarded for a bad checksum. TR 101 290
+     *                          <b>CRC_error</b>, Priority 2
+     * @param pcrDiscontinuities unannounced jumps in the program clock. TR 101 290
+     *                          <b>PCR_discontinuity_indicator_error</b>, Priority 2
+     * @param erroredSeconds    seconds of stream time containing at least one error, counted
+     *                          once however many it holds. The figure a broadcast probe leads
+     *                          with, because it answers "for how long was this broken" rather
+     *                          than "how many packets went wrong"
+     * @param observedSeconds   seconds of stream time seen at all, so the above has a
+     *                          denominator
      * @param syncLosses        how many times packet alignment had to be regained
      * @param transportStreamId from the PAT, or -1 before one has arrived
      * @param programCount      how many programs the tables describe
@@ -85,7 +94,10 @@ public record StreamSnapshot(
             long packets,
             long continuityErrors,
             long packetsLostInTs,
-            long tableCrcFailures,
+            long crcErrors,
+            long pcrDiscontinuities,
+            long erroredSeconds,
+            long observedSeconds,
             long syncLosses,
             int transportStreamId,
             int programCount) {
@@ -104,12 +116,17 @@ public record StreamSnapshot(
      * @param lastPtsSeconds presentation time of the most recent unit, or -1
      * @param carriesPcr     whether this track carries the program clock
      * @param randomAccessPoints points a decoder could start from — keyframes, for video
-     * @param damagedIntervals spans between those that contained a gap. <b>The figure closest
-     *                       to what a viewer saw</b>, since everything in a span depends on the
-     *                       frame that begins it. Meaningful on video; on audio nearly every
-     *                       frame is a random-access point, so damage does not propagate
-     * @param spanPackets    average packets between random-access points — how long damage to
-     *                       one persists
+     * @param erroredSeconds seconds of stream time in which this track had at least one
+     *                       error. ETSI TR 101 290's measure, counted per track
+     * @param damagedGops    groups of pictures containing at least one error, counted once per
+     *                       GOP. <b>The figure closest to what a viewer saw</b>: everything in
+     *                       a GOP depends on the frame that begins it, so one gap ruins all of
+     *                       it. Read it on video — nearly every audio frame is its own
+     *                       random-access point, so there it is just an error count
+     * @param gopLengthPackets average packets between random-access points. On video this is
+     *                       how far damage propagates: everything in a GOP depends on the
+     *                       frame that begins it. On audio it is close to 1, since nearly
+     *                       every frame is independently decodable
      */
     public record Track(
             int pid,
@@ -122,8 +139,9 @@ public record StreamSnapshot(
             double lastPtsSeconds,
             boolean carriesPcr,
             long randomAccessPoints,
-            long damagedIntervals,
-            double spanPackets) {
+            long erroredSeconds,
+            long damagedGops,
+            double gopLengthPackets) {
     }
 
     /** Builds a snapshot from the two libraries' own views, taken together. */
@@ -149,7 +167,10 @@ public record StreamSnapshot(
                 stream.packets(),
                 stream.continuityErrors(),
                 stream.packetsLost(),
-                stream.tableCrcFailures(),
+                stream.crcErrors(),
+                stream.pcrDiscontinuities(),
+                stream.erroredSeconds(),
+                stream.observedSeconds(),
                 stream.syncLosses(),
                 programs.transportStreamId(),
                 programs.programs().size());
@@ -162,7 +183,7 @@ public record StreamSnapshot(
                 // Shown anyway: a track that is declared but silent is exactly
                 // the kind of thing worth noticing.
                 tracks.add(new Track(elementary.pid(), describe(programs, elementary),
-                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0));
+                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0, 0));
                 continue;
             }
             tracks.add(new Track(
@@ -176,8 +197,9 @@ public record StreamSnapshot(
                     pid.lastPtsSeconds(),
                     pid.carriesPcr(),
                     pid.randomAccessPoints(),
-                    pid.damagedIntervals(),
-                    pid.averageRandomAccessInterval()));
+                    pid.erroredSeconds(),
+                    pid.damagedGops(),
+                    pid.gopLengthPackets()));
         }
 
         return new StreamSnapshot(streamId, peer, transport, media, viaRelay, List.copyOf(tracks));

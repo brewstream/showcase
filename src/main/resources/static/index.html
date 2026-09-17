@@ -144,12 +144,29 @@
   Push the slider up until <i>dropped</i> moves — that is the budget running out,
   and a continuity error lands on a named track moments later.</p>
 
-  <p><b>Damaged spans</b> is the column closest to what a viewer saw. A span runs
-  between two points where a decoder could start — keyframes — and everything in
-  it depends on the frame that begins it, so one gap anywhere damages all of it.
-  Two packets lost inside one span is a single glitch; two spread across two spans
-  is two. Read it on video: nearly every audio frame is its own starting point, so
-  damage there is a click rather than a second of corruption.</p>
+  <p><b>Errored seconds</b> is the column a broadcast engineer would look at
+  first. It is ETSI TR 101 290's measure: how many seconds of stream time
+  contained at least one error, counted once however many errors the second
+  holds. Forty continuity errors in one bad second is one errored second, and
+  that is the point — it answers <i>for how long was this stream broken</i>
+  rather than <i>how many packets went wrong</i>, which is much closer to what
+  someone watching would describe.</p>
+
+  <p>The clock is the stream's own PCR, not this server's. A file pushed through
+  faster than real time still reports the seconds it actually contains.</p>
+
+  <p><b>GOP damage</b> is the same events counted by media structure instead of
+  by time, and it is the column closest to what a viewer saw. A GOP runs between
+  two points where a decoder could start — keyframes — and everything in it
+  depends on the frame that begins it, so one gap anywhere ruins all of it. Two
+  packets lost inside one GOP is a single glitch; two spread across two GOPs is
+  two. The two columns disagree in a way worth watching: a burst of loss inside
+  one second damages one GOP, while the same loss spread thinly damages every
+  GOP it touches while marking the same one second.</p>
+
+  <p>Read GOP damage on video. Nearly every audio frame is its own starting
+  point, so damage there is a click rather than a ruined second, and the column
+  degenerates into an error count.</p>
 
   <p><i>Recovered</i> counts packets that arrived carrying the retransmit flag.
   <i>Retransmit rate</i> is not shown because it is a send-side figure and this
@@ -221,9 +238,13 @@ function render(data) {
         <td class="num">${fmt(tr.packets)}</td>
         <td class="num">${fmt(tr.pesPackets)}</td>
         <td class="num ${tr.continuityErrors > 0 ? "bad" : ""}">${fmt(tr.continuityErrors)}</td>
-        <td class="num ${tr.damagedIntervals > 0 ? "bad" : ""}">${
+        <td class="num ${tr.erroredSeconds > 0 ? "bad" : ""}">${
+          s.media.observedSeconds > 0
+            ? `${fmt(tr.erroredSeconds)} / ${fmt(s.media.observedSeconds)}`
+            : "–"}</td>
+        <td class="num ${tr.damagedGops > 0 ? "bad" : ""}">${
           tr.randomAccessPoints > 0
-            ? `${fmt(tr.damagedIntervals)} / ${fmt(tr.randomAccessPoints)}`
+            ? `${fmt(tr.damagedGops)} / ${fmt(tr.randomAccessPoints)}`
             : "–"}</td>
         <td class="num">${tr.lastPtsSeconds >= 0 ? tr.lastPtsSeconds.toFixed(2) + "s" : "–"}</td>
       </tr>`).join("");
@@ -254,7 +275,11 @@ function render(data) {
             ${metric("TS packets", fmt(m.packets))}
             ${metric("Continuity errors", fmt(m.continuityErrors), errorClass)}
             ${metric("Packets lost", fmt(m.packetsLostInTs), m.packetsLostInTs > 0 ? "bad" : "")}
-            ${metric("Table CRC fails", fmt(m.tableCrcFailures), m.tableCrcFailures > 0 ? "bad" : "")}
+            ${metric("CRC errors", fmt(m.crcErrors), m.crcErrors > 0 ? "bad" : "")}
+            ${metric("Errored seconds", m.observedSeconds > 0
+              ? `${fmt(m.erroredSeconds)} / ${fmt(m.observedSeconds)}`
+              : "–", m.erroredSeconds > 0 ? "bad" : "")}
+            ${metric("PCR jumps", fmt(m.pcrDiscontinuities), m.pcrDiscontinuities > 0 ? "bad" : "")}
             ${metric("Sync losses", fmt(m.syncLosses), m.syncLosses > 0 ? "bad" : "")}
             ${metric("Programs", fmt(m.programCount))}
           </div>
@@ -264,8 +289,9 @@ function render(data) {
         <h3>Tracks</h3>
         <table>
           <thead><tr><th>Track</th><th>PID</th><th>Packets</th><th>PES</th>
-            <th>Continuity errors</th><th>Damaged spans</th><th>Last PTS</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="7">Waiting for the program tables…</td></tr>'}</tbody>
+            <th>Continuity errors</th><th>Errored seconds</th><th>GOP damage</th>
+            <th>Last PTS</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="8">Waiting for the program tables…</td></tr>'}</tbody>
         </table>
       </div>
     </section>`;
