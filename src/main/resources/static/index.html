@@ -4,113 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BrewStream Showcase</title>
-<style>
-  :root {
-    --bg: #12100e; --panel: #1c1917; --line: #2e2926; --ink: #ece7e1;
-    --dim: #9a8f86; --accent: #c98f5a; --ok: #6bbf7b; --warn: #d8a34a; --bad: #d1614f;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
-  }
-  header {
-    padding: 22px 28px 18px; border-bottom: 1px solid var(--line);
-    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-  }
-  h1 { margin: 0; font-size: 19px; letter-spacing: .01em; font-weight: 650; }
-  h1 span { color: var(--accent); }
-  .sub { color: var(--dim); font-size: 13px; }
-  code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    background: var(--panel); border: 1px solid var(--line);
-    padding: 2px 7px; border-radius: 5px; font-size: 12.5px;
-  }
-  main { padding: 24px 28px 48px; max-width: 1180px; }
-  .empty {
-    border: 1px dashed var(--line); border-radius: 10px; padding: 40px 28px;
-    color: var(--dim); text-align: center;
-  }
-  .empty p { margin: 0 0 14px; }
-  .stream {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 10px; margin-bottom: 22px; overflow: hidden;
-  }
-  .stream > h2 {
-    margin: 0; padding: 14px 18px; font-size: 15px; font-weight: 600;
-    border-bottom: 1px solid var(--line); display: flex;
-    align-items: center; gap: 12px; flex-wrap: wrap;
-  }
-  .peer { color: var(--dim); font-weight: 400; font-size: 12.5px; }
-  .pill {
-    margin-left: auto; font-size: 11.5px; letter-spacing: .04em;
-    text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
-    border: 1px solid currentColor;
-  }
-  .pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); }
-  .bypass {
-    background: rgba(216,163,74,.08); border-bottom: 1px solid var(--line);
-    color: var(--warn); padding: 10px 18px; font-size: 12.5px;
-  }
-  .bypass code { background: transparent; border: 0; padding: 0; color: inherit; }
-  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
-  @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
-  .panel { background: var(--panel); padding: 16px 18px 18px; }
-  .panel h3 {
-    margin: 0 0 12px; font-size: 11.5px; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--dim); font-weight: 600;
-  }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 14px 18px; }
-  .metric .label { color: var(--dim); font-size: 11.5px; margin-bottom: 2px; }
-  .metric .value {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 17px; font-variant-numeric: tabular-nums;
-  }
-  .value.ok { color: var(--ok); } .value.warn { color: var(--warn); } .value.bad { color: var(--bad); }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  th {
-    text-align: left; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase;
-    color: var(--dim); font-weight: 600; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line);
-  }
-  td {
-    padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line);
-    font-variant-numeric: tabular-nums;
-  }
-  tr:last-child td { border-bottom: 0; }
-  td.num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .kind {
-    font-size: 10.5px; letter-spacing: .05em; color: var(--dim);
-    border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; margin-left: 8px;
-  }
-  .controls {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-    padding: 16px 18px; margin-bottom: 22px;
-    display: grid; grid-template-columns: auto 1fr auto auto; gap: 14px 18px; align-items: center;
-  }
-  @media (max-width: 780px) { .controls { grid-template-columns: 1fr; } }
-  .controls h3 {
-    margin: 0; font-size: 11.5px; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--dim); font-weight: 600;
-  }
-  input[type=range] { width: 100%; accent-color: var(--accent); }
-  .lossread {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-variant-numeric: tabular-nums; font-size: 15px; white-space: nowrap;
-  }
-  .lossread small { color: var(--dim); font-size: 11.5px; }
-  button {
-    background: transparent; color: var(--dim); border: 1px solid var(--line);
-    border-radius: 6px; padding: 5px 12px; font: inherit; font-size: 12.5px; cursor: pointer;
-  }
-  button:hover { color: var(--ink); border-color: var(--dim); }
-  footer { color: var(--dim); font-size: 12.5px; padding: 0 28px 34px; max-width: 1180px; }
-  footer b { color: var(--ink); font-weight: 600; }
-</style>
+<link rel="stylesheet" href="showcase.css">
 </head>
 <body>
 <header>
   <h1>Brew<span>Stream</span> showcase</h1>
   <div class="sub">SRT transport health and MPEG-TS media health, sampled together</div>
+  <nav>
+    <a class="on" href="index.html">Listener</a>
+    <a href="caller.html">Caller</a>
+  </nav>
 </header>
 
 <main>
@@ -179,16 +82,8 @@
   next to proof that 10% went missing.</p>
 </footer>
 
+<script src="stream-card.js"></script>
 <script>
-const fmt = n => n === undefined || n === null ? "–" : n.toLocaleString();
-const bytes = n => !n ? "0" : n > 1e6 ? (n / 1e6).toFixed(1) + " MB/s"
-                    : n > 1e3 ? (n / 1e3).toFixed(0) + " kB/s" : n + " B/s";
-
-function metric(label, value, cls) {
-  return `<div class="metric"><div class="label">${label}</div>
-          <div class="value ${cls || ""}">${value}</div></div>`;
-}
-
 function renderLoss(loss) {
   // The slider is left alone while being dragged, so a poll landing mid-drag
   // cannot yank it back to the server's value under the user's finger.
@@ -215,86 +110,16 @@ function render(data) {
   }
 
   el.innerHTML = data.streams.map(s => {
-    const t = s.transport, m = s.media;
-    // Dropped packets are the ones that became visible damage; lost ones were
-    // mostly recovered. Coloured differently on purpose.
-    const droppedClass = t.packetsDropped > 0 ? "bad" : "ok";
-    const errorClass = m.continuityErrors > 0 ? "bad" : "ok";
-    // Recovery is the number that explains "lost but undamaged". Without it the
-    // dashboard shows loss going in and nothing coming out, with no sign of the
-    // work in between.
-    const recovered = t.packetsRecovered > 0
-      ? `${fmt(t.packetsRecovered)} <small style="color:var(--dim)">(${(t.recoveryRate * 100).toFixed(1)}%)</small>`
-      : "0";
-    const bypass = s.viaRelay ? "" : `<div class="bypass">
+    // The one thing this page adds to a stream card: whether the publisher came
+    // through the relay. A stream that went straight to the listener is
+    // unaffected by the slider and silently looks perfectly healthy however far
+    // it is pushed, which is a confusing thing to stare at.
+    const head = s.viaRelay ? "" : '<span class="pill warn">relay bypassed</span>';
+    const banner = s.viaRelay ? "" : `<div class="bypass">
         Publishing straight to the listener on port ${data.srtPort} — the loss slider
         does not affect this stream. Republish to <code>srt://127.0.0.1:${data.publishPort}</code>
         to route it through the relay.</div>`;
-
-    const rows = s.tracks.map(tr => `
-      <tr>
-        <td>${tr.label}<span class="kind">${tr.kind}</span>${tr.carriesPcr ? '<span class="kind">PCR</span>' : ""}</td>
-        <td class="num">0x${tr.pid.toString(16).toUpperCase()}</td>
-        <td class="num">${fmt(tr.packets)}</td>
-        <td class="num">${fmt(tr.pesPackets)}</td>
-        <td class="num ${tr.continuityErrors > 0 ? "bad" : ""}">${fmt(tr.continuityErrors)}</td>
-        <td class="num ${tr.erroredSeconds > 0 ? "bad" : ""}">${
-          s.media.observedSeconds > 0
-            ? `${fmt(tr.erroredSeconds)} / ${fmt(s.media.observedSeconds)}`
-            : "–"}</td>
-        <td class="num ${tr.damagedGops > 0 ? "bad" : ""}">${
-          tr.randomAccessPoints > 0
-            ? `${fmt(tr.damagedGops)} / ${fmt(tr.randomAccessPoints)}`
-            : "–"}</td>
-        <td class="num">${tr.lastPtsSeconds >= 0 ? tr.lastPtsSeconds.toFixed(2) + "s" : "–"}</td>
-      </tr>`).join("");
-
-    return `<section class="stream">
-      <h2>${s.streamId}<span class="peer">${s.peer}</span>
-        ${s.viaRelay ? "" : '<span class="pill warn">relay bypassed</span>'}
-        <span class="pill ${m.healthy ? "ok" : "bad"}">${m.healthy ? "healthy" : "degraded"}</span>
-      </h2>
-      ${bypass}
-      <div class="panels">
-        <div class="panel">
-          <h3>Transport · Roast</h3>
-          <div class="grid">
-            ${metric("RTT", (t.rttMicros / 1000).toFixed(1) + " ms")}
-            ${metric("Received", fmt(t.packetsReceived))}
-            ${metric("Lost", fmt(t.packetsLost), t.packetsLost > 0 ? "warn" : "")}
-            ${metric("Recovered", recovered, t.packetsRecovered > 0 ? "ok" : "")}
-            ${metric("Dropped", fmt(t.packetsDropped), droppedClass)}
-            ${metric("Rate", bytes(t.receiveRateBytes))}
-            ${metric("Buffered", fmt(t.receiveBuffered))}
-            ${metric("Flow window", fmt(t.flowWindowPackets))}
-          </div>
-        </div>
-        <div class="panel">
-          <h3>Media · Grind</h3>
-          <div class="grid">
-            ${metric("TS packets", fmt(m.packets))}
-            ${metric("Continuity errors", fmt(m.continuityErrors), errorClass)}
-            ${metric("Packets lost", fmt(m.packetsLostInTs), m.packetsLostInTs > 0 ? "bad" : "")}
-            ${metric("CRC errors", fmt(m.crcErrors), m.crcErrors > 0 ? "bad" : "")}
-            ${metric("Errored seconds", m.observedSeconds > 0
-              ? `${fmt(m.erroredSeconds)} / ${fmt(m.observedSeconds)}`
-              : "–", m.erroredSeconds > 0 ? "bad" : "")}
-            ${metric("PCR jumps", fmt(m.pcrDiscontinuities), m.pcrDiscontinuities > 0 ? "bad" : "")}
-            ${metric("Sync losses", fmt(m.syncLosses), m.syncLosses > 0 ? "bad" : "")}
-            ${metric("Programs", fmt(m.programCount))}
-          </div>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Tracks</h3>
-        <table>
-          <thead><tr><th>Track</th><th>PID</th><th>Packets</th><th>PES</th>
-            <th>Continuity errors</th><th>Errored seconds</th><th>GOP damage</th>
-            <th>Last PTS</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="8">Waiting for the program tables…</td></tr>'}</tbody>
-        </table>
-      </div>
-    </section>`;
+    return streamCard(s, head, banner);
   }).join("");
 }
 

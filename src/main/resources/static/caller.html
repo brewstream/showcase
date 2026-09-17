@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrewStream Showcase · Caller</title>
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+<header>
+  <h1>Brew<span>Stream</span> showcase</h1>
+  <div class="sub">Calling out to a source, and reading what it actually delivers</div>
+  <nav>
+    <a href="index.html">Listener</a>
+    <a class="on" href="caller.html">Caller</a>
+  </nav>
+</header>
+
+<main>
+  <div class="connect">
+    <form id="connect" class="row" autocomplete="off">
+      <div class="field">
+        <label for="host">Host</label>
+        <input id="host" name="host" required placeholder="10.0.0.20" value="127.0.0.1">
+      </div>
+      <div class="field">
+        <label for="port">Port</label>
+        <input id="port" name="port" type="number" min="1" max="65535" required value="9000">
+      </div>
+      <div class="field">
+        <label for="streamId">Stream ID</label>
+        <input id="streamId" name="streamId" placeholder="optional">
+      </div>
+      <div class="field">
+        <label for="passphrase">Passphrase</label>
+        <input id="passphrase" name="passphrase" type="password" placeholder="none">
+      </div>
+      <div class="field">
+        <label for="latencyMs">Latency</label>
+        <input id="latencyMs" name="latencyMs" type="number" min="20" max="8000" step="10" value="120">
+      </div>
+      <div class="field">
+        <label for="keyLength">Key</label>
+        <select id="keyLength" name="keyLength">
+          <option value="16">AES-128</option>
+          <option value="24">AES-192</option>
+          <option value="32">AES-256</option>
+        </select>
+      </div>
+      <button class="go" type="submit">Connect</button>
+    </form>
+    <p class="note" id="formNote">Several sources at once is the point — connect to as many as you like.
+      They share one event loop group rather than a thread pool each. <b>Latency</b> is the
+      recovery budget for this path, in milliseconds: roughly three to four times its
+      round-trip time.</p>
+  </div>
+  <div id="content"></div>
+</main>
+
+<footer>
+  <p><b>The other half of SRT.</b> The listener page waits to be published to and
+  puts a lossy relay in front of itself, because a loopback never drops anything
+  and recovery has nothing to recover from. This page does the opposite: it
+  connects out to a real source over a real path, and there is nothing to induce
+  — whatever the network does is what the figures show.</p>
+
+  <p><b>Nothing below the connection changed.</b> The cards here are rendered by
+  the same code as the listener page, from the same JSON, because Roast gives a
+  connection the same type whichever end opened it and Grind never learns which
+  end it is attached to. Attaching the analysis is the same two handlers in the
+  same order:</p>
+
+  <p><code>connection.pipeline().addLast(new MpegTsDecoder(analyzer), new TsHealthHandler(analyzer));</code></p>
+
+  <p><b>Reading the result.</b> Against a source across a real network, the
+  figures worth watching first are <i>dropped</i> and <i>errored seconds</i>.
+  Lost-but-recovered packets cost nothing visible and are the normal state of a
+  working link. Dropped packets are what ARQ could not retrieve inside the
+  latency budget, and they land as continuity errors on a named track moments
+  later. If dropped is climbing, the latency budget is too small for the path's
+  round-trip time — that is the number to raise, not the bitrate to lower.</p>
+
+  <p><b>The budget is per connection</b>, because it belongs to the path rather
+  than to the application. A local encoder is happy at 40ms; a source several
+  hops away needs three to four times its round-trip time, and the <i>RTT</i>
+  figure on each card is what to multiply. Connect to the same source twice at
+  two different settings and the trade-off is on screen side by side: the longer
+  budget recovers more and shows fewer errored seconds, and is further behind
+  live for it.</p>
+
+  <p>The listener page runs at a deliberately low 30ms so its loss slider has a
+  reachable breaking point on loopback. That figure would be wrong here, and this
+  page does not share it.</p>
+
+  <p><b>Failures are kept on screen</b> rather than cleared, because why a
+  connection did not establish is usually the most useful thing this page can
+  tell you. A wrong passphrase is reported as such; so is a source that never
+  answered, which almost always means the address, the port, or a firewall.</p>
+
+  <p><b>On the passphrase.</b> It is sent over whatever this page is served on,
+  which in a demo is plain HTTP, and it is bound as a <code>char[]</code> and
+  zeroed as soon as Roast has copied it, so this application never holds a
+  <code>String</code> of it that would sit in the heap until GC. That is a real
+  precaution and a small one: point this at your own encoder on your own
+  network, and do not treat it as a credential store.</p>
+</footer>
+
+<script src="stream-card.js"></script>
+<script>
+const form = document.getElementById("connect");
+const note = document.getElementById("formNote");
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  const body = new URLSearchParams(new FormData(form));
+  try {
+    const response = await fetch("/api/caller/connect", { method: "POST", body });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    // Cleared the moment it leaves the page. The field is the only copy the
+    // browser held, and leaving it populated invites a second connection that
+    // silently reuses a passphrase the user thinks they typed fresh.
+    document.getElementById("passphrase").value = "";
+    tick();
+  } catch (e) {
+    note.innerHTML = `<span style="color:var(--bad)">Could not start the connection: ${e.message}</span>`;
+  }
+});
+
+async function disconnect(id) {
+  await fetch(`/api/caller/${id}/disconnect`, { method: "POST" });
+  tick();
+}
+
+function statusPill(c) {
+  if (c.status === "CONNECTING") return '<span class="pill pending">connecting</span>';
+  if (c.status === "FAILED") return '<span class="pill bad">failed</span>';
+  if (c.status === "CLOSED") return '<span class="pill closed">closed</span>';
+  return "";
+}
+
+let latencyPrefilled = false;
+
+function render(data) {
+  // Once only, and never while it is being edited: the server's default is a
+  // starting point, not something to keep pushing back under the user's cursor.
+  const latency = document.getElementById("latencyMs");
+  if (!latencyPrefilled && data.defaultLatencyMs && document.activeElement !== latency) {
+    latency.value = data.defaultLatencyMs;
+    latencyPrefilled = true;
+  }
+
+  const el = document.getElementById("content");
+  if (!data.connections.length) {
+    el.innerHTML = `<div class="empty">
+      <p>Not connected to anything. Enter a source above — an encoder, an EMX, or
+         another SRT listener — and this page will connect to it and inspect what
+         comes back.</p>
+      <p>To try it without hardware, run a listener locally and point this at it:</p>
+      <p><code>ffmpeg -re -f lavfi -i testsrc=size=640x360:rate=25 -f lavfi -i sine \\
+        -c:v libx264 -preset ultrafast -bf 2 -g 25 -c:a aac \\
+        -f mpegts "srt://127.0.0.1:9000?mode=listener"</code></p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = data.connections.map(c => {
+    const label = `${esc(c.target)}${c.streamId ? " · " + esc(c.streamId) : ""}`;
+    const stop = `<button onclick="disconnect('${esc(c.id)}')">Disconnect</button>`;
+
+    // Before the handshake completes there are no figures to show, so the card
+    // is replaced by its own title bar rather than rendered full of dashes.
+    if (!c.stream) {
+      const why = c.error
+        ? `<div class="failure">${esc(c.error)}</div>`
+        : `<div class="waiting">Handshaking with ${esc(c.target)}…</div>`;
+      return `<section class="stream">
+        <h2>${label}${c.encrypted ? '<span class="kind">encrypted</span>' : ""}
+          ${stop}${statusPill(c)}
+        </h2>
+        ${why}
+      </section>`;
+    }
+
+    const head = `<span class="kind">${c.latencyMillis} ms budget</span>`
+      + `${c.encrypted ? '<span class="kind">encrypted</span>' : ""}${stop}${statusPill(c)}`;
+
+    // Dropped packets are the budget running out, and the budget is the thing to
+    // change. Said here rather than left for the reader to infer, because the
+    // instinct is usually to blame the source or lower the bitrate.
+    const dropped = c.stream.transport.packetsDropped;
+    const banner = c.status === "CLOSED"
+      ? '<div class="failure">The source closed this connection. The figures below are its final state.</div>'
+      : dropped > 0
+        ? `<div class="bypass">${fmt(dropped)} packets dropped: ARQ could not recover them inside the
+           ${c.latencyMillis} ms budget, and they are gone. Reconnect at a higher latency — three to
+           four times this path's round-trip time — and watch this go to zero.</div>`
+        : "";
+    return streamCard(c.stream, head, banner);
+  }).join("");
+}
+
+async function tick() {
+  try {
+    render(await (await fetch("/api/caller")).json());
+  } catch (e) {
+    document.getElementById("content").innerHTML =
+      `<div class="empty"><p>Cannot reach the showcase. Is it still running?</p></div>`;
+  }
+}
+
+tick();
+setInterval(tick, 500);
+</script>
+</body>
+</html>
