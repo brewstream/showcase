@@ -93,6 +93,9 @@ function streamCard(s, head, banner) {
             ? m.maxPcrIntervalMillis.toFixed(0) + " ms"
             : "–", m.pcrRepetitionErrors > 0 ? "warn" : "")}
           ${metric("PTS gaps", fmt(m.ptsErrors), m.ptsErrors > 0 ? "bad" : "")}
+          ${metric("Table gaps", m.maxTableIntervalMillis > 0
+            ? `${fmt(m.tableErrors)} · ${m.maxTableIntervalMillis.toFixed(0)} ms`
+            : "–", m.tableErrors > 0 ? "bad" : "")}
           ${metric("Programs", fmt(m.programCount))}
         </div>
       </div>

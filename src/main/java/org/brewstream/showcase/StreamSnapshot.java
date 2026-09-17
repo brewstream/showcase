@@ -84,6 +84,12 @@ public record StreamSnapshot(
      *                          apart from the health badge rather than feeding it —
      *                          ffmpeg spaces PCRs at 80ms and those streams are fine
      * @param maxPcrIntervalMillis the widest of those gaps, which says by how much
+     * @param tableErrors       PAT or PMT gaps longer than TR 101 290's 500ms. Priority 1 —
+     *                          without these a receiver cannot find the programs — but still
+     *                          apart from the health badge, because a gap caused by loss is
+     *                          already counted as loss
+     * @param maxTableIntervalMillis the widest gap between PSI tables, which a muxer
+     *                          normally keeps to a couple of hundred milliseconds
      * @param ptsErrors         tracks going longer than TR 101 290's 700ms without a PTS.
      *                          Also conformance rather than damage — but unlike the PCR
      *                          figure this one stays quiet on ordinary streams, so a
@@ -108,6 +114,8 @@ public record StreamSnapshot(
             long pcrRepetitionErrors,
             double maxPcrIntervalMillis,
             long ptsErrors,
+            long tableErrors,
+            double maxTableIntervalMillis,
             long erroredSeconds,
             long observedSeconds,
             long syncLosses,
@@ -188,6 +196,8 @@ public record StreamSnapshot(
                 stream.pcrRepetitionErrors(),
                 widestPcrInterval(stream),
                 stream.ptsErrors(),
+                stream.patRepetitionErrors() + stream.pmtRepetitionErrors(),
+                stream.maxTableIntervalMillis(),
                 stream.erroredSeconds(),
                 stream.observedSeconds(),
                 stream.syncLosses(),
