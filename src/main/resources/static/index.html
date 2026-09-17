@@ -71,6 +71,20 @@
   point, so damage there is a click rather than a ruined second, and the column
   degenerates into an error count.</p>
 
+  <p><b>Slack</b> is the smallest gap a track ever left between a timestamp and
+  the clock — how much time the decoder had in hand before that frame was due.
+  Audio routinely runs tighter than video — around 100&nbsp;ms is normal — so this
+  only turns amber below 50&nbsp;ms, where the margin is genuinely thin. Nothing
+  here goes red on a stream that is merely close to the line; <i>late frames</i>
+  counts the ones that actually missed, which a player can only stall on or
+  drop.</p>
+
+  <p>Read slack down a column over time, <b>not across tracks</b>. Video and audio
+  sit at quite different figures by nature — around 720&nbsp;ms and 410&nbsp;ms in
+  a typical ffmpeg stream — because they are buffered and interleaved
+  differently. That difference is not lip-sync drift, and treating it as one would
+  condemn every working stream.</p>
+
   <p><b>Ad markers</b> appear only when the stream signals them, on a PID the PMT
   declares as SCTE-35. That PID is <i>silent between breaks</i> — minutes of
   nothing is the normal state, not a fault.</p>

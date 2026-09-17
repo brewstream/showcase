@@ -103,6 +103,8 @@ function streamCard(s, head, banner) {
         m.observedSeconds > 0 ? `${fmt(tr.erroredSeconds)} / ${fmt(m.observedSeconds)}` : "–"}</td>
       <td class="num ${tr.damagedGops > 0 ? "bad" : ""}">${
         tr.randomAccessPoints > 0 ? `${fmt(tr.damagedGops)} / ${fmt(tr.randomAccessPoints)}` : "–"}</td>
+      <td class="num ${tr.minPtsSkewMillis < 0 ? "" : tr.minPtsSkewMillis < 50 ? "warn" : ""}">${
+        tr.minPtsSkewMillis >= 0 ? tr.minPtsSkewMillis.toFixed(0) + " ms" : "–"}</td>
       <td class="num">${tr.lastPtsSeconds >= 0 ? tr.lastPtsSeconds.toFixed(2) + "s" : "–"}</td>
     </tr>`).join("");
 
@@ -142,6 +144,7 @@ function streamCard(s, head, banner) {
             ? m.maxPcrIntervalMillis.toFixed(0) + " ms"
             : "–", m.pcrRepetitionErrors > 0 ? "warn" : "")}
           ${metric("PTS gaps", fmt(m.ptsErrors), m.ptsErrors > 0 ? "bad" : "")}
+          ${metric("Late frames", fmt(m.lateTimestamps), m.lateTimestamps > 0 ? "bad" : "")}
           ${metric("Table gaps", m.maxTableIntervalMillis > 0
             ? `${fmt(m.tableErrors)} · ${m.maxTableIntervalMillis.toFixed(0)} ms`
             : "–", m.tableErrors > 0 ? "bad" : "")}
@@ -155,8 +158,8 @@ function streamCard(s, head, banner) {
       <table>
         <thead><tr><th>Track</th><th>PID</th><th>Packets</th><th>PES</th>
           <th>Continuity errors</th><th>Errored seconds</th><th>GOP damage</th>
-          <th>Last PTS</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="8">Waiting for the program tables…</td></tr>'}</tbody>
+          <th>Slack</th><th>Last PTS</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="9">Waiting for the program tables…</td></tr>'}</tbody>
       </table>
     </div>
   </section>`;

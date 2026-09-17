@@ -98,6 +98,11 @@ public record StreamSnapshot(
      *                          already counted as loss
      * @param maxTableIntervalMillis the widest gap between PSI tables, which a muxer
      *                          normally keeps to a couple of hundred milliseconds
+     * @param lateTimestamps    timestamps that arrived at or past their own deadline, across
+     *                          every track. Not a conformance failure and not counted against
+     *                          the health badge — nothing was lost — but the clearest sign a
+     *                          stream will not play smoothly, since a decoder handed a frame
+     *                          too late can only stall or drop it
      * @param ptsErrors         tracks going longer than TR 101 290's 700ms without a PTS.
      *                          Also conformance rather than damage — but unlike the PCR
      *                          figure this one stays quiet on ordinary streams, so a
@@ -122,6 +127,7 @@ public record StreamSnapshot(
             long pcrRepetitionErrors,
             double maxPcrIntervalMillis,
             long ptsErrors,
+            long lateTimestamps,
             long tableErrors,
             double maxTableIntervalMillis,
             long erroredSeconds,
@@ -151,6 +157,11 @@ public record StreamSnapshot(
      *                       a GOP depends on the frame that begins it, so one gap ruins all of
      *                       it. Read it on video — nearly every audio frame is its own
      *                       random-access point, so there it is just an error count
+     * @param minPtsSkewMillis the smallest gap between this track's timestamps and the
+     *                       clock — how little slack it ever left the decoder. <b>Read it
+     *                       per track over time, never between tracks</b>: video and audio
+     *                       sit at different skews by nature, and the difference between
+     *                       them is not lip-sync drift
      * @param maxPtsIntervalMillis the widest gap between this track's timestamps. Reads 0
      *                       where several PTS arrive between two PCRs, which is the normal
      *                       case on video — the clock only moves when a PCR does
@@ -172,6 +183,7 @@ public record StreamSnapshot(
             long randomAccessPoints,
             long erroredSeconds,
             long damagedGops,
+            double minPtsSkewMillis,
             double maxPtsIntervalMillis,
             double gopLengthPackets) {
     }
@@ -232,6 +244,7 @@ public record StreamSnapshot(
                 stream.pcrRepetitionErrors(),
                 widestPcrInterval(stream),
                 stream.ptsErrors(),
+                stream.lateTimestamps(),
                 stream.patRepetitionErrors() + stream.pmtRepetitionErrors(),
                 stream.maxTableIntervalMillis(),
                 stream.erroredSeconds(),
@@ -248,7 +261,7 @@ public record StreamSnapshot(
                 // Shown anyway: a track that is declared but silent is exactly
                 // the kind of thing worth noticing.
                 tracks.add(new Track(elementary.pid(), describe(programs, elementary),
-                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0, 0, 0));
+                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0, -1, 0, 0));
                 continue;
             }
             tracks.add(new Track(
@@ -264,6 +277,7 @@ public record StreamSnapshot(
                     pid.randomAccessPoints(),
                     pid.erroredSeconds(),
                     pid.damagedGops(),
+                    pid.minPtsSkewMillis(),
                     pid.maxPtsIntervalMillis(),
                     pid.gopLengthPackets()));
         }
