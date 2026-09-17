@@ -103,6 +103,13 @@ public record StreamSnapshot(
      * @param pesPackets     PES packets — frames for video, but not for audio
      * @param lastPtsSeconds presentation time of the most recent unit, or -1
      * @param carriesPcr     whether this track carries the program clock
+     * @param randomAccessPoints points a decoder could start from — keyframes, for video
+     * @param damagedIntervals spans between those that contained a gap. <b>The figure closest
+     *                       to what a viewer saw</b>, since everything in a span depends on the
+     *                       frame that begins it. Meaningful on video; on audio nearly every
+     *                       frame is a random-access point, so damage does not propagate
+     * @param spanPackets    average packets between random-access points — how long damage to
+     *                       one persists
      */
     public record Track(
             int pid,
@@ -113,7 +120,10 @@ public record StreamSnapshot(
             long packetsLost,
             long pesPackets,
             double lastPtsSeconds,
-            boolean carriesPcr) {
+            boolean carriesPcr,
+            long randomAccessPoints,
+            long damagedIntervals,
+            double spanPackets) {
     }
 
     /** Builds a snapshot from the two libraries' own views, taken together. */
@@ -152,7 +162,7 @@ public record StreamSnapshot(
                 // Shown anyway: a track that is declared but silent is exactly
                 // the kind of thing worth noticing.
                 tracks.add(new Track(elementary.pid(), describe(programs, elementary),
-                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false));
+                        elementary.streamType().kind().name(), 0, 0, 0, 0, -1, false, 0, 0, 0));
                 continue;
             }
             tracks.add(new Track(
@@ -164,7 +174,10 @@ public record StreamSnapshot(
                     pid.packetsLost(),
                     pid.pesPackets(),
                     pid.lastPtsSeconds(),
-                    pid.carriesPcr()));
+                    pid.carriesPcr(),
+                    pid.randomAccessPoints(),
+                    pid.damagedIntervals(),
+                    pid.averageRandomAccessInterval()));
         }
 
         return new StreamSnapshot(streamId, peer, transport, media, viaRelay, List.copyOf(tracks));

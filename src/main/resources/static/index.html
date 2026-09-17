@@ -144,6 +144,13 @@
   Push the slider up until <i>dropped</i> moves — that is the budget running out,
   and a continuity error lands on a named track moments later.</p>
 
+  <p><b>Damaged spans</b> is the column closest to what a viewer saw. A span runs
+  between two points where a decoder could start — keyframes — and everything in
+  it depends on the frame that begins it, so one gap anywhere damages all of it.
+  Two packets lost inside one span is a single glitch; two spread across two spans
+  is two. Read it on video: nearly every audio frame is its own starting point, so
+  damage there is a click rather than a second of corruption.</p>
+
   <p><i>Recovered</i> counts packets that arrived carrying the retransmit flag.
   <i>Retransmit rate</i> is not shown because it is a send-side figure and this
   side only receives: it would read zero however hard ARQ was working.</p>
@@ -214,6 +221,10 @@ function render(data) {
         <td class="num">${fmt(tr.packets)}</td>
         <td class="num">${fmt(tr.pesPackets)}</td>
         <td class="num ${tr.continuityErrors > 0 ? "bad" : ""}">${fmt(tr.continuityErrors)}</td>
+        <td class="num ${tr.damagedIntervals > 0 ? "bad" : ""}">${
+          tr.randomAccessPoints > 0
+            ? `${fmt(tr.damagedIntervals)} / ${fmt(tr.randomAccessPoints)}`
+            : "–"}</td>
         <td class="num">${tr.lastPtsSeconds >= 0 ? tr.lastPtsSeconds.toFixed(2) + "s" : "–"}</td>
       </tr>`).join("");
 
@@ -253,8 +264,8 @@ function render(data) {
         <h3>Tracks</h3>
         <table>
           <thead><tr><th>Track</th><th>PID</th><th>Packets</th><th>PES</th>
-            <th>Continuity errors</th><th>Last PTS</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="6">Waiting for the program tables…</td></tr>'}</tbody>
+            <th>Continuity errors</th><th>Damaged spans</th><th>Last PTS</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7">Waiting for the program tables…</td></tr>'}</tbody>
         </table>
       </div>
     </section>`;
