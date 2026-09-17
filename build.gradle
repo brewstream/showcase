@@ -24,7 +24,7 @@ dependencies {
     // The two libraries this exists to demonstrate. Roast is published; Grind is
     // substituted from the sibling build by the composite above.
     implementation 'io.github.brewstream:roast:0.1.2'
-    implementation 'io.github.brewstream:grind'
+    implementation 'io.github.brewstream:grind-core'
     implementation 'io.github.brewstream:grind-netty'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
