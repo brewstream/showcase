@@ -24,6 +24,55 @@ function esc(s) {
 }
 
 /**
+ * Ad markers, when the stream signals them.
+ *
+ * Absent entirely from a stream that declares no splice PID, rather than shown
+ * as an empty table: most streams do not carry ad markers, and a permanently
+ * empty panel would read as something being broken.
+ *
+ * A declared-but-silent PID is the normal state between breaks, so that case
+ * says so in words instead.
+ */
+function splicePanel(s) {
+  if (!s.carriesSplices) {
+    return "";
+  }
+  if (!s.splices.length) {
+    return `<div class="panel">
+      <h3>Ad markers · SCTE-35</h3>
+      <p class="quiet">This stream signals ad markers, and none has arrived yet.
+         A splice PID is silent between breaks, so this is the usual state.</p>
+    </div>`;
+  }
+
+  // Newest first: a live view is read from the top.
+  const rows = s.splices.slice().reverse().map(sp => {
+    // A warning that arrived after the moment it describes could not have been
+    // acted on, which is worth colouring rather than hiding.
+    const late = sp.preRollSeconds >= 0 && sp.preRollSeconds < 0.5;
+    const preRoll = sp.preRollSeconds < 0
+      ? '<span class="bad">after the fact</span>'
+      : `<span class="${late ? "warn" : ""}">${sp.preRollSeconds.toFixed(1)}s</span>`;
+    return `
+      <tr>
+        <td>${esc(sp.description)}${sp.copies > 1
+          ? `<span class="kind">&times;${sp.copies}</span>` : ""}</td>
+        <td class="num">${sp.arrivalSeconds >= 0 ? sp.arrivalSeconds.toFixed(2) + "s" : "–"}</td>
+        <td class="num">${sp.spliceSeconds >= 0 ? sp.spliceSeconds.toFixed(2) + "s" : "–"}</td>
+        <td class="num">${preRoll}</td>
+      </tr>`;
+  }).join("");
+
+  return `<div class="panel">
+    <h3>Ad markers · SCTE-35</h3>
+    <table>
+      <thead><tr><th>Marker</th><th>Received</th><th>Fires</th><th>Warning</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+/**
  * The two panels and the track table for one stream.
  *
  * `head` is whatever belongs in the card's title bar beyond the stream id — the
@@ -100,6 +149,7 @@ function streamCard(s, head, banner) {
         </div>
       </div>
     </div>
+    ${splicePanel(s)}
     <div class="panel">
       <h3>Tracks</h3>
       <table>

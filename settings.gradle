@@ -9,5 +9,6 @@ includeBuild('../grind') {
     dependencySubstitution {
         substitute module('io.github.brewstream:grind-core') using project(':grind-core')
         substitute module('io.github.brewstream:grind-netty') using project(':grind-netty')
+        substitute module('io.github.brewstream:grind-scte') using project(':grind-scte')
     }
 }

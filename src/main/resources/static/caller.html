@@ -92,6 +92,20 @@
   reachable breaking point on loopback. That figure would be wrong here, and this
   page does not share it.</p>
 
+  <p><b>Ad markers</b> appear only when the stream signals them, on a PID the PMT
+  declares as SCTE-35. That PID is <i>silent between breaks</i> — minutes of
+  nothing is the normal state, not a fault.</p>
+
+  <p>Each marker shows two times, because they are different things. <i>Received</i>
+  is when the signal reached us; <i>fires</i> is the moment it describes, which is
+  always later. The gap between them — the <i>warning</i> — is how much notice a
+  downstream ad server got, a couple of seconds being typical. A warning that
+  arrives after the moment it describes could not have been acted on, and is
+  called out as such rather than shown as zero.</p>
+
+  <p>Markers are sent more than once for redundancy, so repeated copies are folded
+  into one row with a count rather than listed as separate breaks.</p>
+
   <p><b>PCR spacing</b> is the widest gap between consecutive clock references,
   and it will almost certainly read <i>80 ms</i> in amber against anything ffmpeg
   produced. That is real — ETSI TR 101 290 asks for one every 40 ms, and ffmpeg's

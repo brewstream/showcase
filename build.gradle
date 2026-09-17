@@ -26,6 +26,7 @@ dependencies {
     implementation 'io.github.brewstream:roast:0.1.2'
     implementation 'io.github.brewstream:grind-core'
     implementation 'io.github.brewstream:grind-netty'
+    implementation 'io.github.brewstream:grind-scte'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

@@ -26,6 +26,12 @@ import java.util.List;
  *                    silently looks perfectly healthy no matter where it is set - which
  *                    is a confusing thing to stare at, so the page says so
  * @param tracks      the media tracks, flattened for display
+ * @param splices     ad markers seen on this stream, oldest first, or empty — which is
+ *                    the usual state even on a stream that carries them, since a splice
+ *                    PID is silent between breaks
+ * @param carriesSplices whether the tables declare a splice PID at all. Distinguishes
+ *                    "no markers yet" from "this stream does not signal them", which an
+ *                    empty list alone cannot
  */
 public record StreamSnapshot(
         String streamId,
@@ -33,7 +39,9 @@ public record StreamSnapshot(
         Transport transport,
         Media media,
         boolean viaRelay,
-        List<Track> tracks) {
+        List<Track> tracks,
+        List<Splice> splices,
+        boolean carriesSplices) {
 
     /**
      * What the SRT connection is doing.
@@ -168,9 +176,37 @@ public record StreamSnapshot(
             double gopLengthPackets) {
     }
 
+    /**
+     * One ad marker, as a dashboard row.
+     *
+     * <p><b>Two times, deliberately.</b> A marker is transmitted ahead of the
+     * moment it describes, so {@code arrivalSeconds} and {@code spliceSeconds}
+     * are different figures and the gap between them is the warning a downstream
+     * system got. Showing only the first claims a break is happening while the
+     * programme still runs.
+     *
+     * @param description    a readable summary — "Provider Placement Opportunity Start
+     *                       [ABCD0123456H] for 2.0s"
+     * @param command        the SCTE 35 command carrying it, for the ones not summarised
+     * @param arrivalSeconds when the marker reached us, in stream time
+     * @param spliceSeconds  when the splice takes effect, or -1 if it names no time
+     * @param preRollSeconds the gap between them. Negative means the warning arrived too
+     *                       late to act on, which is worth seeing rather than hiding
+     * @param copies         how many times this same marker was sent. Muxers repeat them
+     *                       for redundancy, so more than one is normal
+     */
+    public record Splice(
+            String description,
+            String command,
+            double arrivalSeconds,
+            double spliceSeconds,
+            double preRollSeconds,
+            int copies) {
+    }
+
     /** Builds a snapshot from the two libraries' own views, taken together. */
     public static StreamSnapshot of(String streamId, String peer, boolean viaRelay,
-            ConnectionStats connection, TsStreamStats stream) {
+            ConnectionStats connection, TsStreamStats stream, SpliceLog splices) {
 
         Transport transport = new Transport(
                 connection.rttMicros(),
@@ -232,7 +268,9 @@ public record StreamSnapshot(
                     pid.gopLengthPackets()));
         }
 
-        return new StreamSnapshot(streamId, peer, transport, media, viaRelay, List.copyOf(tracks));
+        return new StreamSnapshot(streamId, peer, transport, media, viaRelay, List.copyOf(tracks),
+                splices == null ? List.of() : splices.recent(),
+                splices != null && splices.carriesSpliceInformation());
     }
 
     /**

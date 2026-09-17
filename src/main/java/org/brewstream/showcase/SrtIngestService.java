@@ -78,12 +78,14 @@ public class SrtIngestService implements AutoCloseable {
 
         // Decode transport packets and account for them, then discard. A real
         // router would forward here instead; the showcase only measures.
+        SpliceLog splices = new SpliceLog(analyzer);
         connection.pipeline().addLast(
                 new MpegTsDecoder(analyzer),
                 new TsHealthHandler(analyzer),
+                splices,
                 new io.netty.channel.ChannelInboundHandlerAdapter());
 
-        byStreamId.put(streamId, new Ingest(connection, analyzer));
+        byStreamId.put(streamId, new Ingest(connection, analyzer, splices));
         log.info("stream started: {} from {}", streamId, connection.metadata().peerAddress());
     }
 
@@ -110,7 +112,8 @@ public class SrtIngestService implements AutoCloseable {
                     String.valueOf(peer),
                     peer.getPort() == proxyPort,
                     ingest.connection.stats(),
-                    ingest.analyzer.stats()));
+                    ingest.analyzer.stats(),
+                    ingest.splices));
         }
         return out;
     }
@@ -133,6 +136,6 @@ public class SrtIngestService implements AutoCloseable {
      * It is only ever touched from that connection's event loop, which is where
      * {@code TsHealthHandler} calls it from.
      */
-    private record Ingest(SrtConnection connection, TsAnalyzer analyzer) {
+    private record Ingest(SrtConnection connection, TsAnalyzer analyzer, SpliceLog splices) {
     }
 }

@@ -197,6 +197,7 @@ public class SrtCallerService implements AutoCloseable {
         private final int latencyMillis;
         private final Instant startedAt = Instant.now();
         private final TsAnalyzer analyzer = new TsAnalyzer();
+        private final SpliceLog splices = new SpliceLog(analyzer);
 
         private volatile SrtConnection connection;
         private volatile String status = "CONNECTING";
@@ -216,6 +217,7 @@ public class SrtCallerService implements AutoCloseable {
             connection.pipeline().addLast(
                     new MpegTsDecoder(analyzer),
                     new TsHealthHandler(analyzer),
+                    splices,
                     new io.netty.channel.ChannelInboundHandlerAdapter());
             connection.addEventListener(new SrtConnectionListener() {
                 @Override
@@ -266,7 +268,7 @@ public class SrtCallerService implements AutoCloseable {
                 // describe the same instant. viaRelay is false and stays false:
                 // there is no relay on this path, which is the whole point of it.
                 snapshot = StreamSnapshot.of(streamId, String.valueOf(live.metadata().peerAddress()),
-                        false, live.stats(), analyzer.stats());
+                        false, live.stats(), analyzer.stats(), splices);
             }
             return new CallerView(id, target, streamId, encrypted, status, error,
                     latencyMillis, snapshot);
