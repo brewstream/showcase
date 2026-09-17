@@ -71,6 +71,14 @@
   point, so damage there is a click rather than a ruined second, and the column
   degenerates into an error count.</p>
 
+  <p><b>PCR spacing</b> is the widest gap between consecutive clock references,
+  and it will almost certainly read <i>80 ms</i> in amber against anything ffmpeg
+  produced. That is real — ETSI TR 101 290 asks for one every 40 ms, and ffmpeg's
+  muxer defaults to twice that — but it is a <i>conformance</i> finding, not
+  damage. Nothing is lost; the receiver's clock recovery just has less to work
+  with. It is shown apart from the health badge for exactly that reason, and the
+  badge stays green. Add <code>-pcr_period 20</code> to ffmpeg and it goes away.</p>
+
   <p><i>Recovered</i> counts packets that arrived carrying the retransmit flag.
   <i>Retransmit rate</i> is not shown because it is a send-side figure and this
   side only receives: it would read zero however hard ARQ was working.</p>

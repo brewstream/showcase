@@ -79,6 +79,11 @@ public record StreamSnapshot(
      *                          <b>CRC_error</b>, Priority 2
      * @param pcrDiscontinuities unannounced jumps in the program clock. TR 101 290
      *                          <b>PCR_discontinuity_indicator_error</b>, Priority 2
+     * @param pcrRepetitionErrors PCRs arriving further apart than TR 101 290's 40ms.
+     *                          A conformance figure, not a damage one, so it is shown
+     *                          apart from the health badge rather than feeding it —
+     *                          ffmpeg spaces PCRs at 80ms and those streams are fine
+     * @param maxPcrIntervalMillis the widest of those gaps, which says by how much
      * @param erroredSeconds    seconds of stream time containing at least one error, counted
      *                          once however many it holds. The figure a broadcast probe leads
      *                          with, because it answers "for how long was this broken" rather
@@ -96,6 +101,8 @@ public record StreamSnapshot(
             long packetsLostInTs,
             long crcErrors,
             long pcrDiscontinuities,
+            long pcrRepetitionErrors,
+            double maxPcrIntervalMillis,
             long erroredSeconds,
             long observedSeconds,
             long syncLosses,
@@ -169,6 +176,8 @@ public record StreamSnapshot(
                 stream.packetsLost(),
                 stream.crcErrors(),
                 stream.pcrDiscontinuities(),
+                stream.pcrRepetitionErrors(),
+                widestPcrInterval(stream),
                 stream.erroredSeconds(),
                 stream.observedSeconds(),
                 stream.syncLosses(),
@@ -203,6 +212,23 @@ public record StreamSnapshot(
         }
 
         return new StreamSnapshot(streamId, peer, transport, media, viaRelay, List.copyOf(tracks));
+    }
+
+    /**
+     * The widest PCR gap across every PID carrying a clock.
+     *
+     * <p>The worst offender rather than an average: one program spacing its PCRs
+     * badly is the thing worth seeing, and averaging it with a well-behaved
+     * neighbour would hide it.
+     */
+    private static double widestPcrInterval(TsStreamStats stream) {
+        double widest = 0;
+        for (PidStats pid : stream.pids()) {
+            if (pid.carriesPcr()) {
+                widest = Math.max(widest, pid.maxPcrIntervalMillis());
+            }
+        }
+        return widest;
     }
 
     private static String describe(ProgramMap programs, ElementaryStream elementary) {

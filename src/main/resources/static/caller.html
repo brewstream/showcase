@@ -92,6 +92,14 @@
   reachable breaking point on loopback. That figure would be wrong here, and this
   page does not share it.</p>
 
+  <p><b>PCR spacing</b> is the widest gap between consecutive clock references,
+  and it will almost certainly read <i>80 ms</i> in amber against anything ffmpeg
+  produced. That is real — ETSI TR 101 290 asks for one every 40 ms, and ffmpeg's
+  muxer defaults to twice that — but it is a <i>conformance</i> finding, not
+  damage. Nothing is lost; the receiver's clock recovery just has less to work
+  with. It is shown apart from the health badge for exactly that reason, and the
+  badge stays green. Add <code>-pcr_period 20</code> to ffmpeg and it goes away.</p>
+
   <p><b>Failures are kept on screen</b> rather than cleared, because why a
   connection did not establish is usually the most useful thing this page can
   tell you. A wrong passphrase is reported as such; so is a source that never
