@@ -9,23 +9,9 @@ can tell you packets were lost and retransmitted.
 jumped on the H.264 track of program 1. Separately those are numbers. Sampled
 together they are a causal chain you can watch.
 
-## Before it will build
-
-Roast resolves from Maven Central. **Grind does not — it is unpublished**, so it
-comes from a sibling checkout through a Gradle composite build:
-
-```sh
-git clone https://github.com/brewstream/roast.git      # optional, published anyway
-git clone https://github.com/brewstream/grind.git
-git clone https://github.com/brewstream/showcase.git
-```
-
-The three must sit beside each other, because `settings.gradle` reaches for
-`../grind`. Without it the build fails at dependency resolution with no hint that
-a composite build is involved, which is why this is the first section rather than
-a footnote.
-
 ## Running it
+
+Both libraries resolve from Maven Central, so a single clone is all it takes.
 
 ```sh
 ./gradlew bootRun

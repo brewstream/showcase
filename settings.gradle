@@ -1,14 +1,17 @@
 rootProject.name = 'brewstream-showcase'
 
-// Grind is not published yet, so it comes from the sibling checkout. The
-// substitutions are kept explicit even though the project and artifact names now
-// agree: Gradle matches a composite build on the *project* name, and stating the
-// mapping means a future divergence fails here rather than silently resolving
-// against something stale from a repository.
-includeBuild('../grind') {
-    dependencySubstitution {
-        substitute module('io.github.brewstream:grind-core') using project(':grind-core')
-        substitute module('io.github.brewstream:grind-netty') using project(':grind-netty')
-        substitute module('io.github.brewstream:grind-scte') using project(':grind-scte')
-    }
-}
+// Grind resolves from Maven Central like Roast does, so this builds from a single
+// clone with nothing checked out beside it.
+//
+// To work against local changes to Grind instead, uncomment the composite build
+// below. The substitutions have to be spelled out: Gradle matches a composite on
+// the *project* name, and without them the dependencies quietly resolve against
+// the published version while appearing to use the local one.
+//
+// includeBuild('../grind') {
+//     dependencySubstitution {
+//         substitute module('io.github.brewstream:grind-core') using project(':grind-core')
+//         substitute module('io.github.brewstream:grind-netty') using project(':grind-netty')
+//         substitute module('io.github.brewstream:grind-scte') using project(':grind-scte')
+//     }
+// }
