@@ -134,7 +134,8 @@ function streamCard(s, head, banner) {
           ${metric("TS packets", fmt(m.packets))}
           ${metric("Continuity errors", fmt(m.continuityErrors), errorClass)}
           ${metric("Packets lost", fmt(m.packetsLostInTs), m.packetsLostInTs > 0 ? "bad" : "")}
-          ${metric("CRC errors", fmt(m.crcErrors), m.crcErrors > 0 ? "bad" : "")}
+          ${metric("PSI CRC errors", fmt(m.crcErrors), m.crcErrors > 0 ? "bad" : "")}
+          ${metric("SI CRC errors", fmt(m.dvbCrcErrors), m.dvbCrcErrors > 0 ? "warn" : "")}
           ${metric("Errored seconds", m.observedSeconds > 0
             ? `${fmt(m.erroredSeconds)} / ${fmt(m.observedSeconds)}`
             : "–", m.erroredSeconds > 0 ? "bad" : "")}

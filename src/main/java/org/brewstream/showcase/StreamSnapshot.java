@@ -83,8 +83,20 @@ public record StreamSnapshot(
      * @param packets           transport packets seen
      * @param continuityErrors  counter jumps — where transport loss becomes media damage
      * @param packetsLostInTs   how many packets those jumps account for
-     * @param crcErrors         PSI sections discarded for a bad checksum. TR 101 290
-     *                          <b>CRC_error</b>, Priority 2
+     * @param crcErrors         PAT and PMT sections discarded for a bad checksum. TR 101 290
+     *                          <b>CRC_error</b>, Priority 2. Counted against the health
+     *                          badge: a corrupt PAT or PMT can leave the stream's structure
+     *                          unknown, so it is worse than loss on a video PID
+     * @param dvbCrcErrors      DVB SI sections — SDT, NIT, EIT — discarded for a bad
+     *                          checksum. The same TR 101 290 Priority 2 check, kept as its
+     *                          own figure and <b>apart from the health badge</b>, because
+     *                          losing one costs a name or a programme description rather
+     *                          than the stream: every PID stays findable and every frame
+     *                          stays decodable. Shown because the alternative is worse —
+     *                          track labels come from the SDT, so a stream whose SI is
+     *                          arriving corrupt falls back to "program 1 H.264 / AVC" and
+     *                          looks identical to a contribution feed that never carried an
+     *                          SDT at all. Those two need opposite responses
      * @param pcrDiscontinuities unannounced jumps in the program clock. TR 101 290
      *                          <b>PCR_discontinuity_indicator_error</b>, Priority 2
      * @param pcrRepetitionErrors PCRs arriving further apart than TR 101 290's 40ms.
@@ -123,6 +135,7 @@ public record StreamSnapshot(
             long continuityErrors,
             long packetsLostInTs,
             long crcErrors,
+            long dvbCrcErrors,
             long pcrDiscontinuities,
             long pcrRepetitionErrors,
             double maxPcrIntervalMillis,
@@ -240,6 +253,7 @@ public record StreamSnapshot(
                 stream.continuityErrors(),
                 stream.packetsLost(),
                 stream.crcErrors(),
+                stream.dvbCrcErrors(),
                 stream.pcrDiscontinuities(),
                 stream.pcrRepetitionErrors(),
                 widestPcrInterval(stream),
