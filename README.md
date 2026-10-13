@@ -93,7 +93,7 @@ the handshake, so changing it means restarting both the app and the publisher.
 | Panel | Source | Says |
 |---|---|---|
 | Transport | Roast `ConnectionStats` | RTT, packets lost and dropped, retransmit rate, flow window, buffer occupancy |
-| Media | Grind `TsStreamStats` | TS packets, continuity errors, table CRC failures, sync losses, programs |
+| Media | Grind `TsStreamStats` | TS packets, continuity errors, PSI and SI table CRC failures counted apart, sync losses, programs |
 | Tracks | Grind `ProgramMap` + `PidStats` | each track by name — "program 1 H.264 / AVC" — with its own packet counts, errors and presentation time |
 
 **The distinction worth understanding:** packets *lost* are usually recovered by

@@ -15,22 +15,44 @@ java {
 
 repositories {
     mavenCentral()
+    // inference4j's unreleased main branch, built by JitPack. Limited to its
+    // group so nothing else is looked up there.
+    maven {
+        url = 'https://jitpack.io'
+        content { includeGroup 'com.github.inference4j.inference4j' }
+    }
 }
 
 dependencies {
     implementation platform("org.springframework.boot:spring-boot-dependencies:4.1.1")
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     // The two libraries this exists to demonstrate. Roast is published; Grind is
     // substituted from the sibling build by the composite above.
-    implementation 'io.github.brewstream:roast:0.1.2'
-    implementation 'io.github.brewstream:grind-core:0.1.1'
-    implementation 'io.github.brewstream:grind-netty:0.1.1'
-    implementation 'io.github.brewstream:grind-scte:0.1.1'
+    implementation 'io.github.brewstream:roast:0.1.3'
+    implementation 'io.github.brewstream:grind-core:0.3.0'
+    implementation 'io.github.brewstream:grind-netty:0.3.0'
+    implementation 'io.github.brewstream:grind-scte:0.3.0'
+
+    // The relay page: a Barista brew, SRT in, SRT out for ffplay.
+    implementation 'io.github.brewstream:barista-spring-boot-starter:0.4.0'
+
+    // Live transcription of the relayed audio (MoonshineRecognizer, Silero VAD).
+    // main-SNAPSHOT is re-checked every 24 hours; --refresh-dependencies forces it.
+    implementation 'com.github.inference4j.inference4j:inference4j-core:main-SNAPSHOT'
+    // AAC to PCM for it. Tianscar's fork of JAAD: the de.sfuhrm build mis-decodes
+    // PNS, which ffmpeg's AAC encoder uses by default.
+    implementation 'com.tianscar.javasound:jaad:0.9.4'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 test {
     useJUnitPlatform()
+}
+
+// ONNX Runtime loads native code through the FFM API.
+tasks.named('bootRun') {
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
 }

@@ -13,6 +13,7 @@
   <nav>
     <a class="on" href="index.html">Listener</a>
     <a href="caller.html">Caller</a>
+    <a href="relay.html">Relay</a>
   </nav>
 </header>
 
@@ -98,6 +99,25 @@
 
   <p>Markers are sent more than once for redundancy, so repeated copies are folded
   into one row with a count rather than listed as separate breaks.</p>
+
+  <p><b>PSI CRC errors</b> and <b>SI CRC errors</b> are the same ETSI TR 101 290
+  Priority 2 check counted against two different kinds of table, and the split is
+  the point. PSI is the PAT and the PMT — the structure. Lose one to corruption
+  and a receiver may not be able to find the programs at all, so it counts
+  against the health badge. SI is DVB's service information — the SDT, NIT and
+  EIT — and losing one of those costs a <i>name</i>, not the stream: every PID
+  stays findable and every frame stays decodable, so it is shown apart from the
+  badge and the badge stays green.</p>
+
+  <p>It is worth watching anyway, because track labels come from the SDT. A
+  stream whose SI is arriving corrupt quietly falls back to
+  <i>program 1 H.264 / AVC</i> — which looks exactly like a contribution feed
+  that never carried an SDT in the first place, and most do not. Without this
+  figure there is no way to tell the two apart, and they call for opposite
+  responses: one is normal, the other means something upstream is damaging
+  tables. On a real broadcast multiplex the EIT is the largest thing in the
+  stream and takes loss as a matter of course, which is the other half of why
+  folding this into the badge would report working streams as broken.</p>
 
   <p><b>PCR spacing</b> is the widest gap between consecutive clock references,
   and it will almost certainly read <i>80 ms</i> in amber against anything ffmpeg

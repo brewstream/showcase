@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrewStream Showcase · Relay</title>
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body>
+<header>
+  <h1>Brew<span>Stream</span> showcase</h1>
+  <div class="sub">Relaying a stream to a player, and transcribing it as it passes</div>
+  <nav>
+    <a href="index.html">Listener</a>
+    <a href="caller.html">Caller</a>
+    <a class="on" href="relay.html">Relay</a>
+  </nav>
+</header>
+
+<main>
+  <div class="connect">
+    <form id="create" class="row" autocomplete="off">
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" name="name" required value="Relay">
+      </div>
+      <div class="field">
+        <label for="inPort">Encoder port</label>
+        <input id="inPort" name="inPort" type="number" min="0" max="65535" value="0">
+      </div>
+      <div class="field">
+        <label for="outPort">Player port</label>
+        <input id="outPort" name="outPort" type="number" min="0" max="65535" value="0">
+      </div>
+      <button class="go" type="submit">Start relay</button>
+    </form>
+    <p class="note" id="formNote">Two SRT listeners: an encoder publishes MPEG-TS to one,
+      ffplay calls the other. Port <b>0</b> takes one from <code>barista.ports.srt</code>.</p>
+  </div>
+  <div id="content"></div>
+</main>
+
+<footer>
+  <p><b>A relay is a Barista brew.</b> One source, an SRT listener the encoder
+  publishes to, fanned out to one output, an SRT listener the player calls. Both
+  ends dial in, so neither needs to know where the other is.</p>
+
+  <p><b>The transcript</b> comes from a third output on every relay, which the
+  showcase itself calls over loopback, exactly as ffplay calls the player output.
+  Grind finds the AAC track, JAAD decodes it to PCM, and inference4j's Moonshine
+  streaming recognizer turns speech into lines, pushed over
+  <code>/ws/transcript?brew=&lt;id&gt;</code>: started, revised while spoken,
+  completed once final. ADTS AAC only (LC and HE-AAC); LATM is not supported.</p>
+</footer>
+
+<script src="stream-card.js"></script>
+<script>
+const form = document.getElementById("create");
+const note = document.getElementById("formNote");
+const content = document.getElementById("content");
+
+// One card per relay, kept across polls so the transcript is not wiped by
+// re-rendering the status above it.
+const cards = new Map();
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  try {
+    const response = await fetch("/api/relay", { method: "POST", body: new URLSearchParams(new FormData(form)) });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || `${response.status} ${response.statusText}`);
+    }
+    tick();
+  } catch (e) {
+    note.innerHTML = `<span style="color:var(--bad)">Could not start the relay: ${esc(e.message)}</span>`;
+  }
+});
+
+async function remove(id) {
+  await fetch(`/api/relay/${encodeURIComponent(id)}`, { method: "DELETE" });
+  tick();
+}
+
+function pill(health) {
+  if (health === "GOOD") return '<span class="pill ok">good</span>';
+  if (health === "DEGRADED") return '<span class="pill warn">degraded</span>';
+  return '<span class="pill bad">down</span>';
+}
+
+function rate(bits) {
+  if (!bits) return "0";
+  return bits > 1e6 ? (bits / 1e6).toFixed(2) + " Mb/s" : (bits / 1e3).toFixed(0) + " kb/s";
+}
+
+function legRow(leg, role) {
+  return `<tr>
+    <td>${role}<span class="kind">${esc(leg.kind)}</span></td>
+    <td class="num">${esc(leg.address || "–")}</td>
+    <td>${esc(leg.state.toLowerCase())}</td>
+    <td class="num">${fmt(leg.connections)}</td>
+    <td class="num">${fmt(leg.bytes)}</td>
+    <td class="num">${leg.droppedChunks ? `<span class="warn">${fmt(leg.droppedChunks)}</span>` : "0"}</td>
+    <td class="quiet">${esc(leg.error || leg.lastEvent || "")}</td>
+  </tr>`;
+}
+
+function statusHtml(r) {
+  const src = r.sources[0];
+  const out = r.outputs.find(o => o.id === "player");
+  const tap = r.outputs.find(o => o.id === "transcriber");
+  const ffmpeg = `ffmpeg -re -i input.ts -c copy -f mpegts "srt://${src.address}?pkt_size=1316"`;
+  const ffplay = `ffplay -fflags nobuffer "srt://${out.address}"`;
+  return `
+    <div class="panels">
+      <div class="panel">
+        <h3>Legs</h3>
+        <table>
+          <tr><th>Leg</th><th>Address</th><th>State</th><th>Peers</th><th>Bytes</th><th>Dropped</th><th></th></tr>
+          ${legRow(src, "Encoder")}
+          ${legRow(out, "Player")}
+          ${tap ? legRow(tap, "Transcriber") : ""}
+        </table>
+        <div class="grid" style="margin-top:14px">
+          ${metric("Input rate", rate(r.inputBitsPerSecond))}
+          ${metric("Video", esc(src.videoCodec || "–"))}
+          ${metric("Encoder", esc(src.health.toLowerCase()), src.health === "GOOD" ? "ok" : src.health === "DEGRADED" ? "warn" : "bad")}
+          ${metric("Player", esc(out.health.toLowerCase()), out.health === "GOOD" ? "ok" : out.health === "DEGRADED" ? "warn" : "bad")}
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Feed it</h3>
+        <p class="quiet">Publish MPEG-TS to the encoder port:</p>
+        <p><code class="cmd">${esc(ffmpeg)}</code></p>
+        <p class="quiet">Then watch it through the relay:</p>
+        <p><code class="cmd">${esc(ffplay)}</code></p>
+        ${r.error ? `<div class="failure">${esc(r.error)}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+function createCard(r) {
+  const el = document.createElement("section");
+  el.className = "stream";
+  el.innerHTML = `
+    <h2><span class="title"></span> <span class="peer"></span>
+      <button class="del">Stop relay</button><span class="health"></span></h2>
+    <div class="status"></div>
+    <div class="transcript-panel panel">
+      <h3>Live transcript <span class="transcript-state quiet"></span></h3>
+      <div class="transcript">
+        <p class="quiet placeholder">Lines appear here as the relay's AAC audio is
+          transcribed.</p>
+      </div>
+    </div>`;
+  el.querySelector(".del").addEventListener("click", () => remove(r.id));
+  const card = { el, lines: new Map(), socket: null, closed: false };
+  connectTranscript(r.id, card);
+  return card;
+}
+
+function connectTranscript(id, card) {
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  const socket = new WebSocket(`${protocol}://${location.host}/ws/transcript?brew=${encodeURIComponent(id)}`);
+  const state = card.el.querySelector(".transcript-state");
+  card.socket = socket;
+  socket.onmessage = event => {
+    const e = JSON.parse(event.data);
+    switch (e.type) {
+      case "ready":
+        state.textContent = e.status ? `· ${e.status}` : e.attached ? "· attached" : "· waiting for a transcriber";
+        break;
+      case "status":
+        state.textContent = `· ${e.text}`;
+        break;
+      case "started":
+      case "changed":
+      case "completed":
+        renderLine(card, e);
+        break;
+      case "closed":
+        state.textContent = "· relay stopped";
+        break;
+    }
+  };
+  socket.onclose = () => {
+    // Reconnect while the relay exists: a server restart should not need a page reload
+    if (!card.closed) {
+      state.textContent = "· reconnecting";
+      setTimeout(() => { if (!card.closed) connectTranscript(id, card); }, 2000);
+    }
+  };
+}
+
+function renderLine(card, e) {
+  const box = card.el.querySelector(".transcript");
+  const placeholder = box.querySelector(".placeholder");
+  if (placeholder) placeholder.remove();
+  let line = card.lines.get(e.id);
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "line partial";
+    line.innerHTML = '<span class="t"></span><span class="text"></span>';
+    box.appendChild(line);
+    card.lines.set(e.id, line);
+  }
+  line.querySelector(".t").textContent = clock(e.start);
+  line.querySelector(".text").textContent = e.text || "…";
+  if (e.type === "completed") line.classList.remove("partial");
+  // Follow the live edge only if the reader has not scrolled back
+  if (box.scrollHeight - box.scrollTop - box.clientHeight < 60) box.scrollTop = box.scrollHeight;
+}
+
+function clock(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function render(data) {
+  content.querySelector(".offline")?.remove();
+  const seen = new Set();
+  for (const r of data.relays) {
+    seen.add(r.id);
+    let card = cards.get(r.id);
+    if (!card) {
+      card = createCard(r);
+      cards.set(r.id, card);
+      content.appendChild(card.el);
+    }
+    card.el.querySelector(".title").textContent = r.name;
+    card.el.querySelector(".peer").textContent = `${r.id} · ${r.state.toLowerCase()}`;
+    const worst = [...r.sources, ...r.outputs].map(l => l.health)
+      .reduce((a, b) => a === "DOWN" || b === "DOWN" ? "DOWN" : a === "DEGRADED" || b === "DEGRADED" ? "DEGRADED" : "GOOD", "GOOD");
+    card.el.querySelector(".health").innerHTML = pill(worst);
+    card.el.querySelector(".status").innerHTML = statusHtml(r);
+  }
+  for (const [id, card] of cards) {
+    if (!seen.has(id)) {
+      card.closed = true;
+      if (card.socket) card.socket.close();
+      card.el.remove();
+      cards.delete(id);
+    }
+  }
+  const empty = content.querySelector(".empty");
+  if (!data.relays.length && !empty) {
+    content.insertAdjacentHTML("afterbegin", `<div class="empty">
+      <p>No relays. Start one above, publish MPEG-TS to its encoder port, and point ffplay at its player port.</p>
+    </div>`);
+  } else if (data.relays.length && empty) {
+    empty.remove();
+  }
+}
+
+async function tick() {
+  try {
+    render(await (await fetch("/api/relay")).json());
+  } catch (e) {
+    if (!content.querySelector(".offline")) {
+      content.insertAdjacentHTML("afterbegin",
+        `<div class="empty offline"><p>Cannot reach the showcase. Is it still running?</p></div>`);
+    }
+  }
+}
+
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
