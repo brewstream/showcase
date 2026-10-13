@@ -1,17 +1,21 @@
 rootProject.name = 'brewstream-showcase'
 
-// Grind resolves from Maven Central like Roast does, so this builds from a single
-// clone with nothing checked out beside it.
+// Grind is built from the sibling checkout rather than resolved from Maven
+// Central, so this showcase runs against local changes without a release.
 //
-// To work against local changes to Grind instead, uncomment the composite build
-// below. The substitutions have to be spelled out: Gradle matches a composite on
-// the *project* name, and without them the dependencies quietly resolve against
-// the published version while appearing to use the local one.
+// Currently on for Grind phase 3: service names from the SDT reach the dashboard
+// through ProgramMap.describe(), which StreamSnapshot already calls for every
+// track, and phase 3 is not published. Comment this block out to go back to the
+// published version, which is what a clone with nothing checked out beside it
+// needs.
 //
-// includeBuild('../grind') {
-//     dependencySubstitution {
-//         substitute module('io.github.brewstream:grind-core') using project(':grind-core')
-//         substitute module('io.github.brewstream:grind-netty') using project(':grind-netty')
-//         substitute module('io.github.brewstream:grind-scte') using project(':grind-scte')
-//     }
-// }
+// The substitutions have to be spelled out: Gradle matches a composite on the
+// *project* name, and without them the dependencies quietly resolve against the
+// published version while appearing to use the local one.
+includeBuild('../grind') {
+    dependencySubstitution {
+        substitute module('io.github.brewstream:grind-core') using project(':grind-core')
+        substitute module('io.github.brewstream:grind-netty') using project(':grind-netty')
+        substitute module('io.github.brewstream:grind-scte') using project(':grind-scte')
+    }
+}
